@@ -3,6 +3,7 @@ package com.codinginterview.platform.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -16,14 +17,24 @@ import java.util.Map;
 public class Judge0Service {
 
     private static final String JUDGE0_URL = "https://judge0-ce.p.rapidapi.com";
-    private static final String RAPIDAPI_KEY = "8f3236d229mshf214478aac910f1p163fcejsnafaf9637ae53";
     private static final String RAPIDAPI_HOST = "judge0-ce.p.rapidapi.com";
+    
+    @Value("${RAPIDAPI_KEY:}")
+    private String rapidApiKey;
     
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Map<String, Object> executeCode(String code, String language) {
         Map<String, Object> result = new HashMap<>();
+        
+        // Check if API key is configured
+        if (rapidApiKey == null || rapidApiKey.isEmpty()) {
+            result.put("success", false);
+            result.put("output", "");
+            result.put("error", "⚠️ Judge0 API key not configured!\n\n");
+            return result;
+        }
         
         try {
             int languageId = getLanguageId(language);
@@ -44,7 +55,7 @@ public class Judge0Service {
             HttpRequest createRequest = HttpRequest.newBuilder()
                 .uri(URI.create(JUDGE0_URL + "/submissions?base64_encoded=true&wait=true"))
                 .header("Content-Type", "application/json")
-                .header("X-RapidAPI-Key", RAPIDAPI_KEY)
+                .header("X-RapidAPI-Key", rapidApiKey)
                 .header("X-RapidAPI-Host", RAPIDAPI_HOST)
                 .POST(HttpRequest.BodyPublishers.ofString(submissionJson))
                 .build();

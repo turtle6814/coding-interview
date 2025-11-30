@@ -1,15 +1,17 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { getSession } from '../services/api';
-import { useCollaboration } from '../hooks/useCollaboration';
+import { Play, Share2, Terminal, Check, Copy } from 'lucide-react';
 import CodeEditor from '../components/CodeEditor';
-import { Play, Share2, Terminal } from 'lucide-react';
+import { useCollaboration } from '../hooks/useCollaboration';
+import { getSession } from '../services/api';
 
 export default function EditorPage() {
     const { id } = useParams<{ id: string }>();
     const [code, setCode] = useState('// Loading...');
     const [output, setOutput] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
+    const [connectionAttempts, setConnectionAttempts] = useState(0);
+    const [linkCopied, setLinkCopied] = useState(false);
     const workerRef = useRef<Worker | null>(null);
 
     useEffect(() => {
@@ -19,7 +21,7 @@ export default function EditorPage() {
                 setLoading(false);
             }).catch(err => {
                 console.error('Failed to load session:', err);
-                setCode('// Error: Session not found. Please create a new session.');
+                setCode('// Error: Session not found. Creating a new session...');
                 setLoading(false);
             });
         }
@@ -44,6 +46,15 @@ export default function EditorPage() {
         setCode(newCode);
     });
 
+    // Monitor connection changes
+    useEffect(() => {
+        if (!connected) {
+            setConnectionAttempts(prev => prev + 1);
+        } else {
+            setConnectionAttempts(0);
+        }
+    }, [connected]);
+
     const handleCodeChange = (newCode: string) => {
         setCode(newCode);
         sendCodeUpdate(newCode);
@@ -54,9 +65,23 @@ export default function EditorPage() {
         workerRef.current?.postMessage(code);
     };
 
-    const copyLink = () => {
-        navigator.clipboard.writeText(window.location.href);
-        alert('Link copied to clipboard!');
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        } catch (error) {
+            console.error('Failed to copy link:', error);
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = window.location.href;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            setLinkCopied(true);
+            setTimeout(() => setLinkCopied(false), 2000);
+        }
     };
 
     if (loading) return <div className="flex items-center justify-center h-screen text-white">Loading...</div>;
@@ -65,16 +90,37 @@ export default function EditorPage() {
         <div className="flex flex-col h-screen bg-gray-900 text-white">
             <header className="flex items-center justify-between px-6 py-4 bg-gray-800 border-b border-gray-700">
                 <div className="flex items-center space-x-4">
-                    <h1 className="text-xl font-bold">Session: {id}</h1>
+                    <h1 className="text-xl font-bold">Session: {id?.slice(0, 8)}...</h1>
                     <span className={`px-2 py-1 text-xs rounded ${connected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {connected ? 'Connected' : 'Disconnected'}
+                        {connected ? 'Connected' : `Disconnected ${connectionAttempts > 0 ? `(${connectionAttempts} attempts)` : ''}`}
                     </span>
                 </div>
                 <div className="flex items-center space-x-3">
-                    <button onClick={copyLink} className="p-2 hover:bg-gray-700 rounded-lg transition-colors" title="Share Session">
-                        <Share2 size={20} />
+                    <button 
+                        onClick={copyLink} 
+                        className={`flex items-center space-x-2 p-2 rounded-lg transition-all ${
+                            linkCopied 
+                                ? 'bg-green-600 text-white' 
+                                : 'hover:bg-gray-700'
+                        }`}
+                        title={linkCopied ? 'Link Copied!' : 'Share Session'}
+                    >
+                        {linkCopied ? (
+                            <>
+                                <Check size={20} />
+                                <span className="text-sm font-medium">Copied!</span>
+                            </>
+                        ) : (
+                            <>
+                                <Share2 size={20} />
+                                <span className="text-sm font-medium hidden sm:inline">Share</span>
+                            </>
+                        )}
                     </button>
-                    <button onClick={runCode} className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors">
+                    <button 
+                        onClick={runCode} 
+                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors"
+                    >
                         <Play size={18} />
                         <span>Run</span>
                     </button>
@@ -92,10 +138,10 @@ export default function EditorPage() {
                     </div>
                     <div className="flex-1 p-4 font-mono text-sm overflow-auto text-gray-300">
                         {output.length === 0 ? (
-                            <span className="text-gray-600 italic">Run code to see output...</span>
+                            <p className="text-gray-500 italic">Run code to see output...</p>
                         ) : (
                             output.map((line, i) => (
-                                <div key={i} className="mb-1">{line}</div>
+                                <div key={i} className={line.startsWith('Error:') ? 'text-red-400' : ''}>{line}</div>
                             ))
                         )}
                     </div>

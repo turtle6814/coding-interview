@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostic Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            font-size: 3em;
+            margin: 0 0 20px 0;
+        }
+        .status {
+            font-size: 1.5em;
+            margin: 20px 0;
+        }
+        .success {
+            color: #4ade80;
+        }
+        button {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Frontend Diagnostic Test</h1>
+        <div class="status success">✅ If you can see this, the server is working!</div>
+        <p>This is a simple test page to verify your frontend is serving correctly.</p>
+        <button onclick="testBackend()">Test Backend Connection</button>
+        <button onclick="goToApp()">Go to Main App</button>
+        <div id="result" style="margin-top: 20px;"></div>
+    </div>
+
+    <script>
+        async function testBackend() {
+            const result = document.getElementById('result');
+            result.innerHTML = '⏳ Testing backend...';
+            try {
+                const response = await fetch('http://localhost:8080/api/sessions', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                result.innerHTML = `✅ Backend is working!<br>Session ID: ${data.id}`;
+                result.style.color = '#4ade80';
+            } catch (error) {
+                result.innerHTML = `❌ Backend error: ${error.message}`;
+                result.style.color = '#f87171';
+            }
+        }
+
+        function goToApp() {
+            window.location.href = '/';
+        }
+
+        console.log('🎉 Diagnostic page loaded successfully!');
+        console.log('If you see this in the console, JavaScript is working.');
+    </script>
+</body>
+</html>

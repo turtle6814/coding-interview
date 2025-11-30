@@ -41,6 +41,22 @@ export async function getSession(id: string): Promise<Session> {
   return response.json();
 }
 
+export async function updateSession(id: string, code: string): Promise<Session> {
+  const response = await fetch(`${API_URL}/api/sessions/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ code }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update session');
+  }
+
+  return response.json();
+}
+
 export async function executeCode(sessionId: string, code: string, language: string): Promise<ExecutionResult> {
   const response = await fetch(`${API_URL}/api/sessions/${sessionId}/execute`, {
     method: 'POST',

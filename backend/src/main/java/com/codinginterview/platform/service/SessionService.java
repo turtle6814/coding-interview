@@ -1,38 +1,40 @@
 package com.codinginterview.platform.service;
 
-import com.codinginterview.platform.domain.Session;
-import com.codinginterview.platform.domain.User;
+import com.codinginterview.platform.model.Session;
 import com.codinginterview.platform.repository.SessionRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class SessionService {
-    private final SessionRepository sessionRepository;
 
-    public Session createSession() {
-        String id = UUID.randomUUID().toString();
-        Session session = new Session(id, "javascript", "// Start coding...");
-        return sessionRepository.save(session);
-    }
+    @Autowired
+    private SessionRepository sessionRepository;
 
-    public Session getSession(String id) {
-        return sessionRepository.findById(id).orElseThrow(() -> new RuntimeException("Session not found"));
-    }
-
-    public Session updateCode(String sessionId, String code) {
-        Session session = getSession(sessionId);
+    public Session createSession(String language, String code) {
+        Session session = new Session();
+        session.setId(UUID.randomUUID().toString());
+        session.setLanguage(language);
         session.setCode(code);
         return sessionRepository.save(session);
     }
 
-    public Session addUser(String sessionId, String username) {
-        Session session = getSession(sessionId);
-        User user = new User(UUID.randomUUID().toString(), username);
-        session.getUsers().add(user);
-        return sessionRepository.save(session);
+    public Session getSession(String id) {
+        return sessionRepository.findById(id).orElse(null);
+    }
+
+    public Session updateSessionCode(String id, String code) {
+        Session session = sessionRepository.findById(id).orElse(null);
+        if (session != null) {
+            session.setCode(code);
+            return sessionRepository.save(session);
+        }
+        return null;
+    }
+
+    public void deleteSession(String id) {
+        sessionRepository.deleteById(id);
     }
 }

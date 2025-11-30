@@ -1,18 +1,19 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Play, Share2, Terminal, Check, Copy } from 'lucide-react';
+import { Play, Share2, Terminal, Check } from 'lucide-react';
 import CodeEditor from '../components/CodeEditor';
 import { useCollaboration } from '../hooks/useCollaboration';
-import { getSession } from '../services/api';
+import { getSession, updateSession } from '../services/api';
 
 export default function EditorPage() {
     const { id } = useParams<{ id: string }>();
     const [code, setCode] = useState('// Loading...');
     const [output, setOutput] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
-    const [connectionAttempts, setConnectionAttempts] = useState(0);
     const [linkCopied, setLinkCopied] = useState(false);
+    const [executing, setExecuting] = useState(false);
     const workerRef = useRef<Worker | null>(null);
+    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (id) {
@@ -21,23 +22,42 @@ export default function EditorPage() {
                 setLoading(false);
             }).catch(err => {
                 console.error('Failed to load session:', err);
-                setCode('// Error: Session not found. Creating a new session...');
+                setCode('// Error: Session not found. Please create a new session.');
                 setLoading(false);
             });
         }
 
         // Initialize worker
-        workerRef.current = new Worker(new URL('../workers/executor.js', import.meta.url), { type: 'module' });
-        workerRef.current.onmessage = (e) => {
-            const { type, logs, error } = e.data;
-            if (type === 'success') {
-                setOutput(prev => [...prev, '--- Execution Start ---', ...logs, '--- Execution End ---']);
-            } else {
-                setOutput(prev => [...prev, '--- Execution Start ---', ...logs, `Error: ${error}`, '--- Execution End ---']);
-            }
-        };
+        try {
+            workerRef.current = new Worker(
+                new URL('../workers/executor.js', import.meta.url), 
+                { type: 'module' }
+            );
+            
+            workerRef.current.onmessage = (e) => {
+                const { type, logs, error } = e.data;
+                setExecuting(false);
+                
+                if (type === 'success') {
+                    setOutput(prev => [...prev, '--- Execution Start ---', ...logs, '--- Execution End ---']);
+                } else {
+                    setOutput(prev => [...prev, '--- Execution Start ---', ...logs, `Error: ${error}`, '--- Execution End ---']);
+                }
+            };
+
+            workerRef.current.onerror = (error) => {
+                console.error('Worker error:', error);
+                setExecuting(false);
+                setOutput(prev => [...prev, '--- Execution Start ---', `Worker Error: ${error.message}`, '--- Execution End ---']);
+            };
+        } catch (error) {
+            console.error('Failed to create worker:', error);
+        }
 
         return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
             workerRef.current?.terminate();
         };
     }, [id]);
@@ -46,23 +66,48 @@ export default function EditorPage() {
         setCode(newCode);
     });
 
-    // Monitor connection changes
-    useEffect(() => {
-        if (!connected) {
-            setConnectionAttempts(prev => prev + 1);
-        } else {
-            setConnectionAttempts(0);
+    const saveCodeToBackend = async (newCode: string) => {
+        if (!id) return;
+        
+        try {
+            await updateSession(id, newCode);
+            console.log('✅ Code saved to backend');
+        } catch (error) {
+            console.error('❌ Failed to save code:', error);
         }
-    }, [connected]);
+    };
 
     const handleCodeChange = (newCode: string) => {
         setCode(newCode);
+        
+        // Send to WebSocket for real-time collaboration
         sendCodeUpdate(newCode);
+        
+        // Debounce saving to backend (save after 1 second of no typing)
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        saveTimeoutRef.current = setTimeout(() => {
+            saveCodeToBackend(newCode);
+        }, 1000);
     };
 
     const runCode = () => {
+        if (!workerRef.current) {
+            setOutput(['Error: Code executor not initialized']);
+            return;
+        }
+
         setOutput([]);
-        workerRef.current?.postMessage(code);
+        setExecuting(true);
+        
+        try {
+            workerRef.current.postMessage(code);
+        } catch (error) {
+            console.error('Failed to execute code:', error);
+            setExecuting(false);
+            setOutput([`Error: ${error instanceof Error ? error.message : 'Unknown error'}`]);
+        }
     };
 
     const copyLink = async () => {
@@ -72,7 +117,6 @@ export default function EditorPage() {
             setTimeout(() => setLinkCopied(false), 2000);
         } catch (error) {
             console.error('Failed to copy link:', error);
-            // Fallback for older browsers
             const textArea = document.createElement('textarea');
             textArea.value = window.location.href;
             document.body.appendChild(textArea);
@@ -84,7 +128,16 @@ export default function EditorPage() {
         }
     };
 
-    if (loading) return <div className="flex items-center justify-center h-screen text-white">Loading...</div>;
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+                <div className="text-center">
+                    <div className="animate-spin h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p>Loading session...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-screen bg-gray-900 text-white">
@@ -92,13 +145,13 @@ export default function EditorPage() {
                 <div className="flex items-center space-x-4">
                     <h1 className="text-xl font-bold">Session: {id?.slice(0, 8)}...</h1>
                     <span className={`px-2 py-1 text-xs rounded ${connected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {connected ? 'Connected' : `Disconnected ${connectionAttempts > 0 ? `(${connectionAttempts} attempts)` : ''}`}
+                        {connected ? '● Connected' : '○ Disconnected'}
                     </span>
                 </div>
                 <div className="flex items-center space-x-3">
                     <button 
                         onClick={copyLink} 
-                        className={`flex items-center space-x-2 p-2 rounded-lg transition-all ${
+                        className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-all ${
                             linkCopied 
                                 ? 'bg-green-600 text-white' 
                                 : 'hover:bg-gray-700'
@@ -119,10 +172,11 @@ export default function EditorPage() {
                     </button>
                     <button 
                         onClick={runCode} 
-                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors"
+                        disabled={executing}
+                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors"
                     >
                         <Play size={18} />
-                        <span>Run</span>
+                        <span>{executing ? 'Running...' : 'Run'}</span>
                     </button>
                 </div>
             </header>
@@ -141,7 +195,18 @@ export default function EditorPage() {
                             <p className="text-gray-500 italic">Run code to see output...</p>
                         ) : (
                             output.map((line, i) => (
-                                <div key={i} className={line.startsWith('Error:') ? 'text-red-400' : ''}>{line}</div>
+                                <div 
+                                    key={i} 
+                                    className={
+                                        line.startsWith('Error:') || line.startsWith('ERROR:') 
+                                            ? 'text-red-400' 
+                                            : line.startsWith('WARNING:')
+                                            ? 'text-yellow-400'
+                                            : ''
+                                    }
+                                >
+                                    {line}
+                                </div>
                             ))
                         )}
                     </div>

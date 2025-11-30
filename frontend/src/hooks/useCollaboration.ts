@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Client } from '@stomp/stompjs';
+import { useEffect, useRef, useState } from 'react';
+import { Client, type IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
 interface CodeUpdate {
@@ -14,51 +14,49 @@ export function useCollaboration(
 ) {
   const [connected, setConnected] = useState(false);
   const clientRef = useRef<Client | null>(null);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 3;
-  
-  // Store the callback in a ref to avoid effect re-runs
+  const subscriptionRef = useRef<any>(null); // Changed from StompSubscription to any
   const onCodeUpdateRef = useRef(onCodeUpdate);
-  
-  // Update the ref when the callback changes
+  const isActivatingRef = useRef(false);
+
+  // Update callback ref
   useEffect(() => {
     onCodeUpdateRef.current = onCodeUpdate;
   }, [onCodeUpdate]);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || isActivatingRef.current) return;
+
+    console.log('🔌 Setting up WebSocket for session:', sessionId);
+    isActivatingRef.current = true;
 
     const client = new Client({
       webSocketFactory: () => {
-        const wsUrl = 'http://localhost:8080/ws';
-        console.log('🔌 Attempting WebSocket connection:', wsUrl, `(Attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts})`);
-        return new SockJS(wsUrl);
+        console.log('🔌 Creating WebSocket connection to http://localhost:8080/ws');
+        return new SockJS('http://localhost:8080/ws');
       },
       reconnectDelay: 5000,
       heartbeatIncoming: 10000,
       heartbeatOutgoing: 10000,
       connectionTimeout: 15000,
-      debug: (str) => {
-        console.log('STOMP Debug:', str);
-      },
       
       onConnect: () => {
-        console.log('✅ WebSocket Connected to session:', sessionId);
+        console.log('✅ WebSocket Connected!');
         setConnected(true);
-        reconnectAttempts.current = 0;
         
-        // Subscribe to session updates
         try {
-          client.subscribe(`/topic/session/${sessionId}`, (message) => {
-            console.log('📨 Received message:', message.body);
-            try {
-              const update: CodeUpdate = JSON.parse(message.body);
-              // Use the ref to call the latest callback
-              onCodeUpdateRef.current(update.code);
-            } catch (error) {
-              console.error('Failed to parse message:', error);
+          // Subscribe to session updates
+          subscriptionRef.current = client.subscribe(
+            `/topic/session/${sessionId}`, 
+            (message: IMessage) => {
+              console.log('📨 Received message:', message.body);
+              try {
+                const update: CodeUpdate = JSON.parse(message.body);
+                onCodeUpdateRef.current(update.code);
+              } catch (error) {
+                console.error('Failed to parse message:', error);
+              }
             }
-          });
+          );
           console.log('📡 Subscribed to /topic/session/' + sessionId);
         } catch (error) {
           console.error('❌ Failed to subscribe:', error);
@@ -68,59 +66,46 @@ export function useCollaboration(
       onDisconnect: () => {
         console.log('❌ WebSocket Disconnected');
         setConnected(false);
-        reconnectAttempts.current++;
       },
       
       onStompError: (frame) => {
-        console.error('❌ STOMP error:');
-        console.error('  Command:', frame.command);
-        console.error('  Headers:', frame.headers);
-        console.error('  Body:', frame.body);
+        console.error('❌ STOMP error:', frame);
         setConnected(false);
-        reconnectAttempts.current++;
       },
       
       onWebSocketError: (error) => {
         console.error('❌ WebSocket error:', error);
-        setConnected(false);
-        reconnectAttempts.current++;
       },
       
       onWebSocketClose: (event) => {
-        console.log('❌ WebSocket closed:');
-        console.log('  Code:', event.code);
-        console.log('  Reason:', event.reason || 'No reason provided');
-        console.log('  Was Clean:', event.wasClean);
-        console.log('  Type:', event.type);
+        console.log('❌ WebSocket closed:', event.code, event.reason);
         setConnected(false);
-        
-        // If we've exceeded max attempts, stop trying
-        if (reconnectAttempts.current >= maxReconnectAttempts) {
-          console.warn('⚠️ Max reconnection attempts reached. WebSocket collaboration disabled.');
-          console.warn('⚠️ The app will still work, but real-time collaboration is unavailable.');
-        }
       }
     });
 
     clientRef.current = client;
     
-    // Activate the client
     try {
       client.activate();
+      console.log('✅ WebSocket client activated');
     } catch (error) {
-      console.error('❌ Failed to activate WebSocket client:', error);
-      reconnectAttempts.current++;
+      console.error('❌ Failed to activate client:', error);
+      isActivatingRef.current = false;
     }
 
     return () => {
-      console.log('🔌 Deactivating WebSocket client');
+      console.log('🔌 Cleaning up WebSocket connection');
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+      }
       if (clientRef.current) {
         clientRef.current.deactivate();
       }
+      isActivatingRef.current = false;
     };
-  }, [sessionId]); // Removed onCodeUpdate from dependencies
+  }, [sessionId]);
 
-  const sendCodeUpdate = useCallback((code: string) => {
+  const sendCodeUpdate = (code: string) => {
     if (clientRef.current?.connected) {
       try {
         clientRef.current.publish({
@@ -136,9 +121,9 @@ export function useCollaboration(
         console.error('❌ Failed to send code update:', error);
       }
     } else {
-      console.warn('⚠️ Cannot send update: WebSocket not connected (attempts:', reconnectAttempts.current + ')');
+      console.warn('⚠️ Cannot send update: WebSocket not connected');
     }
-  }, [sessionId]);
+  };
 
   return { connected, sendCodeUpdate };
 }

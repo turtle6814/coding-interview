@@ -1,6 +1,6 @@
 package com.codinginterview.platform.repository;
 
-import com.codinginterview.platform.domain.Session;
+import com.codinginterview.platform.model.Session;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

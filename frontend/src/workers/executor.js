@@ -1,22 +1,49 @@
-self.onmessage = (e) => {
+self.onmessage = function(e) {
     const code = e.data;
-    let logs = [];
-    const originalConsoleLog = console.log;
-
-    // Capture console.log
+    const logs = [];
+    
+    // Override console methods to capture output
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    
     console.log = (...args) => {
-        logs.push(args.map(arg => String(arg)).join(' '));
+        logs.push(args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+        ).join(' '));
     };
-
+    
+    console.error = (...args) => {
+        logs.push('ERROR: ' + args.map(arg => String(arg)).join(' '));
+    };
+    
+    console.warn = (...args) => {
+        logs.push('WARNING: ' + args.map(arg => String(arg)).join(' '));
+    };
+    
     try {
-        // Basic sandboxing using Function constructor (not perfect security but standard for browser-side)
-        // For better security, we would use an iframe or a more complex sandbox.
-        // But for "interview" context, this is often sufficient for JS.
-        new Function(code)();
-        self.postMessage({ type: 'success', logs });
+        // Execute the code
+        eval(code);
+        
+        // Restore console methods
+        console.log = originalLog;
+        console.error = originalError;
+        console.warn = originalWarn;
+        
+        self.postMessage({
+            type: 'success',
+            logs: logs.length > 0 ? logs : ['(no output)']
+        });
     } catch (error) {
-        self.postMessage({ type: 'error', error: error.toString(), logs });
-    } finally {
-        console.log = originalConsoleLog;
+        // Restore console methods
+        console.log = originalLog;
+        console.error = originalError;
+        console.warn = originalWarn;
+        
+        self.postMessage({
+            type: 'error',
+            logs: logs,
+            error: error.message
+        });
     }
 };

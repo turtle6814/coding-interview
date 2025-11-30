@@ -1,27 +1,18 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = 'http://localhost:8080/api';
 
 export interface Session {
   id: string;
-  language: string;
   code: string;
-  users: string[];
+  language: string;
 }
 
-export interface ExecutionResult {
-  output: string;
-  error?: string;
-}
-
-export async function createSession(): Promise<Session> {
-  const response = await fetch(`${API_URL}/api/sessions`, {
+export const createSession = async (): Promise<Session> => {
+  const response = await fetch(`${API_BASE_URL}/sessions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      language: 'javascript',
-      code: '// Start coding...'
-    }),
+    body: JSON.stringify({}),
   });
 
   if (!response.ok) {
@@ -29,20 +20,20 @@ export async function createSession(): Promise<Session> {
   }
 
   return response.json();
-}
+};
 
-export async function getSession(id: string): Promise<Session> {
-  const response = await fetch(`${API_URL}/api/sessions/${id}`);
-  
+export const getSession = async (id: string): Promise<Session> => {
+  const response = await fetch(`${API_BASE_URL}/sessions/${id}`);
+
   if (!response.ok) {
-    throw new Error('Failed to fetch session');
+    throw new Error('Failed to get session');
   }
 
   return response.json();
-}
+};
 
-export async function updateSession(id: string, code: string): Promise<Session> {
-  const response = await fetch(`${API_URL}/api/sessions/${id}`, {
+export const updateSession = async (id: string, code: string): Promise<Session> => {
+  const response = await fetch(`${API_BASE_URL}/sessions/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -55,10 +46,14 @@ export async function updateSession(id: string, code: string): Promise<Session> 
   }
 
   return response.json();
-}
+};
 
-export async function executeCode(sessionId: string, code: string, language: string): Promise<ExecutionResult> {
-  const response = await fetch(`${API_URL}/api/sessions/${sessionId}/execute`, {
+export const executeCode = async (code: string, language: string): Promise<{
+  success: boolean;
+  output: string;
+  error: string;
+}> => {
+  const response = await fetch(`${API_BASE_URL}/execute`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -71,4 +66,4 @@ export async function executeCode(sessionId: string, code: string, language: str
   }
 
   return response.json();
-}
+};

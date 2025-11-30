@@ -1,41 +1,49 @@
-import { Editor } from '@monaco-editor/react';
-import { useEffect, useState } from 'react';
+import Editor from '@monaco-editor/react';
 
 interface CodeEditorProps {
     code: string;
+    language: string;
     onChange: (value: string) => void;
-    language?: string;
 }
 
-export default function CodeEditor({ code, onChange, language = 'javascript' }: CodeEditorProps) {
-    const [value, setValue] = useState(code);
-
-    useEffect(() => {
-        setValue(code);
-    }, [code]);
-
-    const handleEditorChange = (value: string | undefined) => {
-        if (value !== undefined) {
-            setValue(value);
-            onChange(value);
-        }
+export default function CodeEditor({ code, language, onChange }: CodeEditorProps) {
+    // Map our language IDs to Monaco language IDs
+    const getMonacoLanguage = (lang: string): string => {
+        const languageMap: Record<string, string> = {
+            'javascript': 'javascript',
+            'typescript': 'typescript',
+            'python': 'python',
+            'java': 'java',
+            'cpp': 'cpp',
+            'c': 'c',
+            'csharp': 'csharp',
+            'go': 'go',
+            'rust': 'rust',
+            'php': 'php',
+            'ruby': 'ruby',
+            'swift': 'swift',
+            'kotlin': 'kotlin',
+        };
+        return languageMap[lang] || 'javascript';
     };
 
     return (
-        <div className="h-full w-full">
-            <Editor
-                height="100%"
-                defaultLanguage="javascript"
-                language={language}
-                value={value}
-                theme="vs-dark"
-                onChange={handleEditorChange}
-                options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    automaticLayout: true,
-                }}
-            />
-        </div>
+        <Editor
+            height="100%"
+            language={getMonacoLanguage(language)}
+            value={code}
+            onChange={(value) => onChange(value || '')}
+            theme="vs-dark"
+            options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: 'on',
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 2,
+                wordWrap: 'on',
+            }}
+        />
     );
 }

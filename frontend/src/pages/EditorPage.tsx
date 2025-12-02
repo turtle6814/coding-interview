@@ -70,7 +70,7 @@ export default function EditorPage() {
         setCode(newCode);
     });
 
-    const saveCodeToBackend = async (newCode: string, newLanguage: string) => {
+    const saveCodeToBackend = async (newCode: string) => {
         if (!id) return;
         
         console.log('💾 Saving to backend...');
@@ -91,7 +91,7 @@ export default function EditorPage() {
             clearTimeout(saveTimeoutRef.current);
         }
         saveTimeoutRef.current = setTimeout(() => {
-            saveCodeToBackend(newCode, language);
+            saveCodeToBackend(newCode);
         }, 1000);
     };
 
@@ -100,7 +100,7 @@ export default function EditorPage() {
         setLanguage(newLanguage);
         
         // Save the language change
-        saveCodeToBackend(code, newLanguage);
+        saveCodeToBackend(code);
     };
 
     const runCode = async () => {

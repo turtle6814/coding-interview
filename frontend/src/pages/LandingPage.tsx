@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Code2, Users, Zap } from 'lucide-react';
+import { Code2, Users, Zap, Calendar } from 'lucide-react';
 import { createSession } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function LandingPage() {
     const navigate = useNavigate();
+    const { isInterviewer } = useAuth();
     const [creating, setCreating] = useState(false);
 
     const handleCreateSession = async () => {
@@ -60,7 +62,16 @@ export default function LandingPage() {
                         </div>
                     </div>
 
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center gap-4">
+                        {isInterviewer && (
+                            <button
+                                onClick={() => navigate('/setup-interview')}
+                                className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold text-lg rounded-xl transition-all transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center gap-2"
+                            >
+                                <Calendar size={24} />
+                                Schedule Interview
+                            </button>
+                        )}
                         <button
                             onClick={handleCreateSession}
                             disabled={creating}
@@ -72,7 +83,7 @@ export default function LandingPage() {
                                     <span>Creating...</span>
                                 </span>
                             ) : (
-                                'Create New Session'
+                                'Quick Practice Session'
                             )}
                         </button>
                     </div>

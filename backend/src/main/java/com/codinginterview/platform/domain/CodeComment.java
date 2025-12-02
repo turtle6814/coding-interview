@@ -10,27 +10,36 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "app_user")
+@Table(name = "code_comments")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Inheritance(strategy = InheritanceType.JOINED)
-public class User {
+public class CodeComment {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     
-    @Column(nullable = false, unique = true)
-    private String username;
+    @Column(nullable = false)
+    private String sessionId;
     
-    @Column(nullable = false, unique = true)
-    private String email;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    private User author;
     
     @Column(nullable = false)
-    private String password;
+    private Integer lineNumber;
     
-    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String content;
+    
     @Column(nullable = false)
-    private Role role;
+    private Boolean resolved = false;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolved_by")
+    private User resolvedBy;
+    
+    private LocalDateTime resolvedAt;
     
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
@@ -38,10 +47,4 @@ public class User {
     
     @UpdateTimestamp
     private LocalDateTime updatedAt;
-    
-    public enum Role {
-        INTERVIEWER,
-        CANDIDATE,
-        ADMIN
-    }
 }

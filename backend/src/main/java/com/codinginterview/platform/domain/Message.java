@@ -5,43 +5,40 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "app_user")
+@Table(name = "messages")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Inheritance(strategy = InheritanceType.JOINED)
-public class User {
+public class Message {
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
     
-    @Column(nullable = false, unique = true)
-    private String username;
-    
-    @Column(nullable = false, unique = true)
-    private String email;
-    
     @Column(nullable = false)
-    private String password;
+    private String sessionId;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sender_id", nullable = false)
+    private User sender;
+    
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String content;
     
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Role role;
+    private MessageType type = MessageType.TEXT;
     
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
-    
-    public enum Role {
-        INTERVIEWER,
-        CANDIDATE,
-        ADMIN
+    public enum MessageType {
+        TEXT,
+        SYSTEM,
+        CODE_SNIPPET
     }
 }
